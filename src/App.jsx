@@ -1,6 +1,6 @@
 import React, { useState, useEffect, lazy, Suspense } from "react";
 
-// Importando os dois "Canais" do seu MFE
+// importa as mfe
 const LoginPageRemota = lazy(() => import("mfe_auth/LoginPage"));
 const RegisterPageRemota = lazy(() => import("mfe_auth/RegisterPage"));
 
@@ -8,7 +8,7 @@ export default function App() {
   const [logado, setLogado] = useState(false);
   const [dadosUsuario, setDadosUsuario] = useState(null);
   
-  // A TV do Shell: começa no canal de "login"
+  // a tela atual vai começar como a de login
   const [telaAtual, setTelaAtual] = useState("login");
 
   useEffect(() => {
@@ -17,7 +17,6 @@ export default function App() {
 
     if (tokenGuardado) {
       setLogado(true);
-      // Mantendo o padrão que você usou no MFE (emailDigitado)
       setDadosUsuario({ emailDigitado: emailGuardado, token: tokenGuardado });
     }
   }, []);
@@ -25,25 +24,51 @@ export default function App() {
   const lidarComSucesso = (pacote) => {
     setLogado(true);
     setDadosUsuario(pacote); 
+    //console.log("O que o backend enviou:", pacote);
 
     localStorage.setItem("meu_token", pacote.token);
-    // Salvamos a propriedade com o nome exato que o seu Login envia
+    localStorage.setItem("meu_refresh", pacote.refresh);
     localStorage.setItem("meu_email", pacote.emailDigitado); 
   };
 
   // Nova função para quando o usuário criar a conta
   const lidarComCadastro = (pacote) => {
+    //console.log("O que o backend enviou:", pacote);
     alert(`Sucesso! O usuário ${pacote.novoEmail} (${pacote.cargo}) foi criado no sistema.`);
-    // Após criar a conta, mandamos ele de volta para a tela de Login para digitar a senha
+    //após criar a conta, vai voltar para a tela de login
     setTelaAtual("login"); 
   };
 
-  const fazerLogout = () => {
-    setLogado(false);
-    setDadosUsuario(null); 
-    setTelaAtual("login"); // Ao sair, garante que a TV volta pro Login
-    localStorage.removeItem("meu_token");
-    localStorage.removeItem("meu_email");
+  const fazerLogout = async () => {
+    try {
+      const tokenAcesso = localStorage.getItem("meu_token"); 
+      const tokenRefresh = localStorage.getItem("meu_refresh");
+
+      // so vai tentar fazer isso se realmente esitver com os tokens(boa pratica)
+      if (tokenAcesso && tokenRefresh) {
+        await fetch("http://localhost:3001/auth/logout", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            // mostra como cracha para mostrar que é valido e assim nao tomar erro 401 na cara
+            "Authorization": `Bearer ${tokenAcesso}` 
+          },
+          // vai mandar o token de refresh para o banco deletar
+          body: JSON.stringify({ refresh: tokenRefresh }) 
+        });
+      }
+    } catch (error) {
+      console.error("erro ao comuniar o sevidor, fazendo logout local no navegador:", error);
+    } finally {
+      setLogado(false);
+      setDadosUsuario(null); 
+      setTelaAtual("login"); 
+      
+      //limpeza manual e local
+      localStorage.removeItem("meu_token");
+      localStorage.removeItem("meu_refresh");
+      localStorage.removeItem("meu_email");
+    }
   };
 
   return (
@@ -55,7 +80,7 @@ export default function App() {
       <main style={{ padding: '20px' }}>
         {logado ? (
           <div>
-            <h2>🚀 Bem-vindo ao Dashboard!</h2>
+            <h2> Login bem sucedido!!!</h2>
             <p>
               Você está logado como: 
               <strong style={{ color: 'blue' }}> {dadosUsuario?.emailDigitado}</strong>
@@ -67,7 +92,7 @@ export default function App() {
         ) : (
           <Suspense fallback={<div>Carregando os módulos do sistema...</div>}>
             
-            {/* CANAL 1: TELA DE LOGIN */}
+            {/* CANAL DA TELA DE LOGIN */}
             {telaAtual === "login" && (
               <LoginPageRemota 
                 onLoginSucceed={lidarComSucesso} 
@@ -75,7 +100,7 @@ export default function App() {
               />
             )}
 
-            {/* CANAL 2: TELA DE CADASTRO */}
+            {/* CANAL DA TELA DE CADAASTRO*/}
             {telaAtual === "cadastro" && (
               <RegisterPageRemota 
                 onRegisterSucceed={lidarComCadastro} 
