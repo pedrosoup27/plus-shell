@@ -1,43 +1,47 @@
 import React, { useState, useEffect, lazy, Suspense } from "react";
 
+// Importando os dois "Canais" do seu MFE
 const LoginPageRemota = lazy(() => import("mfe_auth/LoginPage"));
+const RegisterPageRemota = lazy(() => import("mfe_auth/RegisterPage"));
 
 export default function App() {
   const [logado, setLogado] = useState(false);
   const [dadosUsuario, setDadosUsuario] = useState(null);
+  
+  // A TV do Shell: começa no canal de "login"
+  const [telaAtual, setTelaAtual] = useState("login");
 
-  //roda apenas uma vez quando a tela abre
-  //cura a amnesia - guarda o token no navegador idependentemente se dermos f5
   useEffect(() => {
     const tokenGuardado = localStorage.getItem("meu_token");
     const emailGuardado = localStorage.getItem("meu_email");
 
-    // pula o login se existir um token
     if (tokenGuardado) {
       setLogado(true);
-      setDadosUsuario({ 
-        emailDoUsuario: emailGuardado, 
-        token: tokenGuardado 
-      });
+      // Mantendo o padrão que você usou no MFE (emailDigitado)
+      setDadosUsuario({ emailDigitado: emailGuardado, token: tokenGuardado });
     }
-  }, []); // essa parte serve para indicar que esse trecho vai rodar uma única vez
-
+  }, []);
 
   const lidarComSucesso = (pacote) => {
     setLogado(true);
     setDadosUsuario(pacote); 
 
-    // shell vai guardar os dados no navegador
     localStorage.setItem("meu_token", pacote.token);
-    localStorage.setItem("meu_email", pacote.emailDigitado);
+    // Salvamos a propriedade com o nome exato que o seu Login envia
+    localStorage.setItem("meu_email", pacote.emailDigitado); 
   };
 
-  // LOGOUT
+  // Nova função para quando o usuário criar a conta
+  const lidarComCadastro = (pacote) => {
+    alert(`Sucesso! O usuário ${pacote.novoEmail} (${pacote.cargo}) foi criado no sistema.`);
+    // Após criar a conta, mandamos ele de volta para a tela de Login para digitar a senha
+    setTelaAtual("login"); 
+  };
+
   const fazerLogout = () => {
     setLogado(false);
     setDadosUsuario(null); 
-
-    // limpar token e email no navegador
+    setTelaAtual("login"); // Ao sair, garante que a TV volta pro Login
     localStorage.removeItem("meu_token");
     localStorage.removeItem("meu_email");
   };
@@ -61,8 +65,24 @@ export default function App() {
             <button onClick={fazerLogout}>Fazer Logout</button>
           </div>
         ) : (
-          <Suspense fallback={<div>Carregando Tela de Login...</div>}>
-            <LoginPageRemota onLoginSucceed={lidarComSucesso} />
+          <Suspense fallback={<div>Carregando os módulos do sistema...</div>}>
+            
+            {/* CANAL 1: TELA DE LOGIN */}
+            {telaAtual === "login" && (
+              <LoginPageRemota 
+                onLoginSucceed={lidarComSucesso} 
+                onIrParaCadastro={() => setTelaAtual("cadastro")} // Troca o canal
+              />
+            )}
+
+            {/* CANAL 2: TELA DE CADASTRO */}
+            {telaAtual === "cadastro" && (
+              <RegisterPageRemota 
+                onRegisterSucceed={lidarComCadastro} 
+                onVoltar={() => setTelaAtual("login")} // Volta o canal
+              />
+            )}
+
           </Suspense>
         )}
       </main>
